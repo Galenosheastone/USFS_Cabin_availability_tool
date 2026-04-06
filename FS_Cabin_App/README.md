@@ -117,13 +117,22 @@ python cabin_checker.py --config /path/to/config.yaml  # Use alternate config fi
 2. It collects all dates with status `"Available"` within your window.
 3. It compares against `state.json` (auto-created) to find **newly** available dates
    (dates not seen on the previous run).
-4. If new dates are found, it sends an HTML email listing each site and its available
-   date ranges (e.g., "Jun 14–17").
+4. If new dates are found, it sends an HTML email with a summary table, color-coded
+   calendar grids per cabin, and direct booking links.
 5. It updates `state.json` with the current snapshot.
+
+If the API rate-limits the script (429 errors), it automatically retries with backoff
+(10s → 20s → 40s) before giving up on that month.
 
 ---
 
 ## Troubleshooting
+
+**429 Too Many Requests errors**
+
+The script automatically retries with backoff (10s, 20s, 40s). If you see persistent
+429s across many cabins, the API is heavily throttled — wait a few minutes and re-run.
+After any run with 429 errors, use `--reset` and re-run to ensure complete data.
 
 **403 errors from the API**
 
@@ -147,11 +156,20 @@ want to be alerted every run regardless, set `mode: always` in `config.yaml`. Yo
 also run `--reset` to clear the state and get a one-time re-alert on everything currently
 available.
 
+**"No new availability to report" when you know dates are open**
+
+Your `state.json` from a previous run already recorded those dates. Run:
+```bash
+python cabin_checker.py --reset
+python cabin_checker.py
+```
+
 **No results found for a cabin I know is available**
 
 - Verify the campground ID from the Recreation.gov URL.
 - Check that your `start_date` and `end_date` cover the dates you're interested in.
 - Run with `--verbose` to see detailed API request/response logging.
+- If a previous run had 429 errors, some months may be missing — do a `--reset` and re-run.
 
 ---
 

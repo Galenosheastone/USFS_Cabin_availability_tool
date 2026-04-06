@@ -93,7 +93,7 @@ HEADERS = {
     "Accept": "application/json",
 }
 
-REQUEST_DELAY = 1.5  # seconds between API calls
+REQUEST_DELAY = 2.0  # seconds between API calls
 
 
 def months_in_range(start: date, end: date) -> list[date]:
@@ -110,18 +110,33 @@ def months_in_range(start: date, end: date) -> list[date]:
     return months
 
 
+RETRY_DELAYS = [10, 20, 40]  # seconds to wait after each 429, before giving up
+
+
 def fetch_month_availability(cg_id: str, month_start: date) -> dict | None:
     """Fetch availability JSON for one campground/month. Returns None on error."""
     url = AVAILABILITY_URL.format(cg_id=cg_id)
     params = {"start_date": month_start.strftime("%Y-%m-01T00:00:00.000Z")}
-    try:
-        resp = requests.get(url, headers=HEADERS, params=params, timeout=15)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.exceptions.HTTPError as e:
-        logger.error("HTTP error for campground %s (%s): %s", cg_id, month_start, e)
-    except requests.exceptions.RequestException as e:
-        logger.error("Request error for campground %s (%s): %s", cg_id, month_start, e)
+    for attempt, retry_wait in enumerate([0] + RETRY_DELAYS):
+        if retry_wait:
+            logger.warning(
+                "Rate limited (429) for campground %s (%s) — waiting %ds (attempt %d/%d)",
+                cg_id, month_start, retry_wait, attempt, len(RETRY_DELAYS),
+            )
+            time.sleep(retry_wait)
+        try:
+            resp = requests.get(url, headers=HEADERS, params=params, timeout=15)
+            if resp.status_code == 429:
+                continue  # trigger next retry
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.HTTPError as e:
+            logger.error("HTTP error for campground %s (%s): %s", cg_id, month_start, e)
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error("Request error for campground %s (%s): %s", cg_id, month_start, e)
+            return None
+    logger.error("Giving up on campground %s (%s) after repeated 429s", cg_id, month_start)
     return None
 
 
