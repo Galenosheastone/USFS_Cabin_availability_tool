@@ -1,8 +1,7 @@
 # FS Cabin Checker
 
 A lightweight Python script that periodically checks Recreation.gov for cabin and
-campground availability and sends you an email the moment open dates appear. Designed
-to run as a cron job — set it and forget it.
+campground availability and sends you an email the moment open dates appear. Plese ask BOUT THIS 
 
 Currently configured to monitor ~25 Forest Service cabins and fire lookouts across
 three Montana ranger districts: **Bozeman**, **Hebgen Lake**, and **Yellowstone/Livingston/Shields**.
