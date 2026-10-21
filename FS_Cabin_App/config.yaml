@@ -54,10 +54,9 @@ campgrounds:
   - id: "234410"
     name: "West Boulder Cabin"
 
-# Date range to check for availability
+# Search forward from today automatically (optional start_date/end_date also supported)
 search:
-  start_date: "2026-04-07"  # YYYY-MM-DD
-  end_date: "2026-10-30"
+  lookahead_days: 180
   # Only alert on stays of at least N consecutive nights (1 = any single night)
   min_nights: 1
 
@@ -69,7 +68,7 @@ email:
   sender_email: "galenoshea@gmail.com"
   # Use a Gmail App Password, NOT your real Gmail password.
   # See setup_gmail.md for instructions.
-  sender_password: "ghvk ajxt kvmy ktpj"
+  # Read the Gmail App Password from CABIN_GMAIL_APP_PASSWORD (environment variable).
   recipients:
     - "galenoshea@gmail.com"
     # - "another.person@email.com"
