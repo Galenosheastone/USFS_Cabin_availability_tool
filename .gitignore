@@ -4,3 +4,4 @@ __pycache__/
 .env
 FS_Cabin_App/state.json
 FS_Cabin_App/config.local.yaml
+FS_Cabin_App/dashboard_state.json
