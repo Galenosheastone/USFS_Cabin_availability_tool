@@ -83,7 +83,8 @@ class AvailabilityTests(unittest.TestCase):
         ids = [str(c["id"]) for c in cabins]
         self.assertEqual(len(ids), len(set(ids)))
         self.assertTrue(all(c.get("forest") and c.get("district") for c in cabins))
-        self.assertGreater(len({c["forest"] for c in cabins}), 1)
+        self.assertGreaterEqual(len(cabins), 130)
+        self.assertGreaterEqual(len({c["forest"] for c in cabins}), 7)
         self.assertGreater(len({(c["forest"], c["district"]) for c in cabins}), 3)
 
 
