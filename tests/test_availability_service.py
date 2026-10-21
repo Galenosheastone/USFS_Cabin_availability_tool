@@ -75,6 +75,17 @@ class AvailabilityTests(unittest.TestCase):
         with self.assertRaises(AccessBlocked):
             fetch_month(FakeSession(), "22", date(2026, 11, 1))
 
+    def test_catalog_grouping_and_unique_ids(self):
+        from pathlib import Path
+        import yaml
+        catalog = yaml.safe_load((Path(__file__).parents[1] / "FS_Cabin_App" / "config.yaml").read_text())
+        cabins = catalog["campgrounds"]
+        ids = [str(c["id"]) for c in cabins]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertTrue(all(c.get("forest") and c.get("district") for c in cabins))
+        self.assertGreater(len({c["forest"] for c in cabins}), 1)
+        self.assertGreater(len({(c["forest"], c["district"]) for c in cabins}), 3)
+
 
 if __name__ == "__main__":
     unittest.main()
