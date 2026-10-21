@@ -1,0 +1,60 @@
+# Forest Service Cabin Finder. Put credentials in environment variables, never Git.
+campgrounds:
+  - id: "234336"
+    name: "Battle Ridge Cabin"
+  - id: "234335"
+    name: "Fox Creek Cabin (MT)"
+  - id: "234334"
+    name: "Garnet Mountain Fire Lookout"
+  - id: "234333"
+    name: "Little Bear Cabin"
+  - id: "234607"
+    name: "Maxey Cabin"
+  - id: "234332"
+    name: "Mystic Lake Cabin"
+  - id: "234331"
+    name: "Spanish Creek Cabin"
+  - id: "234328"
+    name: "Window Rock Cabin"
+  - id: "234327"
+    name: "Windy Pass Cabin"
+  - id: "234326"
+    name: "Yellow Mule Cabin"
+  - id: "234365"
+    name: "Basin Station Cabin"
+  - id: "234367"
+    name: "Beaver Creek Cabin (MT)"
+  - id: "234368"
+    name: "Cabin Creek Cabin"
+  - id: "234366"
+    name: "Wapiti Cabin"
+  - id: "234299"
+    name: "Big Creek Cabin"
+  - id: "234415"
+    name: "Deer Creek Cabin (MT)"
+  - id: "234414"
+    name: "Fourmile Cabin"
+  - id: "234298"
+    name: "Ibex Cabin"
+  - id: "234307"
+    name: "Mill Creek Cabin"
+  - id: "234300"
+    name: "Porcupine Cabin"
+  - id: "234309"
+    name: "Trail Creek Cabin"
+  - id: "234413"
+    name: "West Bridger Cabin"
+  - id: "234410"
+    name: "West Boulder Cabin"
+search:
+  lookahead_days: 180
+  min_nights: 1
+email:
+  enabled: false
+  smtp_server: smtp.gmail.com
+  smtp_port: 587
+  sender_email: ''
+  recipients: []
+notifications:
+  mode: new_only
+  state_file: state.json
