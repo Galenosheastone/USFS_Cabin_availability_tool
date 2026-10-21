@@ -104,6 +104,14 @@ with st.sidebar:
     scan_pressed = st.button("🔄 Check availability now", type="primary",
                              use_container_width=True, disabled=not valid_dates or not selected_cabins)
     st.caption("Changing filters updates the saved results immediately. Use Check availability now to retrieve new dates.")
+    st.divider()
+    email_on_scan = st.checkbox("Email results when scan finishes", value=False)
+    auto_recipient = st.text_input(
+        "Send completed results to", placeholder="you@example.com",
+        disabled=not email_on_scan, key="scan_email_recipient"
+    )
+    if email_on_scan:
+        st.caption("Email only sends after a complete scan without API failures. Set CABIN_SMTP_SENDER and CABIN_GMAIL_APP_PASSWORD in Terminal.")
 
 if sync_clicked:
     try:
@@ -124,6 +132,20 @@ if scan_pressed:
         save_dashboard_snapshot(CACHE_PATH, new_snapshot)
         st.success(f"Checked {new_snapshot['months_checked']} monthly inventories. Results updated.")
         snapshot = new_snapshot
+        if email_on_scan:
+            try:
+                validate_recipient(auto_recipient)
+                if new_snapshot.get("failures"):
+                    st.warning("Results updated, but email was not sent because some months failed.")
+                else:
+                    subject, text_body, html_body = build_report(
+                        new_snapshot, selected_cabins, checkin, checkout, min_nights,
+                        weekends, mode == "Exact stay"
+                    )
+                    send_report(auto_recipient, subject, text_body, html_body)
+                    st.success(f"Completed results emailed to {auto_recipient}.")
+            except (ValueError, RuntimeError, OSError, __import__('smtplib').SMTPException) as exc:
+                st.error(f"Scan completed, but email could not be sent: {exc}")
     except (AccessBlocked, AvailabilityError, OSError, ValueError) as exc:
         st.error(f"Live availability check failed: {exc}. Previously saved results were preserved.")
     finally:
