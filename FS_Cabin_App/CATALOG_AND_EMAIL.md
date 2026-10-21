@@ -29,9 +29,9 @@ export CABIN_GMAIL_APP_PASSWORD='your_new_app_password'
 python -m streamlit run FS_Cabin_App/dashboard.py
 ```
 
-After completing an availability scan, expand **Email results to someone**, enter a recipient email, and click **Send results email**. The report includes the date range, matched cabin stays, links to Recreation.gov, and the scan timestamp. The app rejects sending if the currently selected cabin/date coverage is incomplete or any saved monthly requests failed.
+To have an email sent **automatically when a fresh scan completes**, select **Email results when scan finishes** in the sidebar and enter the recipient before clicking **Check availability now**. The scan must complete without failed monthly inventories.\n\nYou can also email an existing completed scan manually: expand **Email results to someone**, enter a recipient, and click **Send results email**. The report includes the date range, matched cabin stays, links to Recreation.gov, and the scan timestamp. The app rejects sending if the currently selected cabin/date coverage is incomplete or any saved monthly requests failed.
 
-Email is **opt-in per click**, not automatically delivered after every scan. It does not use or alter the existing alert notification state. The email sender/credentials must be set on the computer hosting Streamlit. Never expose that computer's public Streamlit instance without authentication if enabling SMTP sending; otherwise anyone with access could send mail.
+Email is **opt-in**: enable the scan-completion checkbox for automatic delivery after that scan, or use the manual send button. It does not schedule recurring automatic emails. It does not use or alter the existing alert notification state. The email sender/credentials must be set on the computer hosting Streamlit. Never expose that computer's public Streamlit instance without authentication if enabling SMTP sending; otherwise anyone with access could send mail.
 
 ## Operational limits
 
