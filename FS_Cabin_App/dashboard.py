@@ -37,6 +37,12 @@ except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError) as exc:
 
 names = {str(c["id"]): str(c.get("name", c["id"])) for c in cabins}
 id_by_name = {name: cg_id for cg_id, name in names.items()}
+forests = sorted({str(c.get("forest", "Uncategorized")) for c in cabins})
+districts_by_forest = {
+    forest: sorted({str(c.get("district", "Unassigned")) for c in cabins
+                    if c.get("forest", "Uncategorized") == forest})
+    for forest in forests
+}
 
 with st.sidebar:
     st.header("Find a cabin")
@@ -53,17 +59,41 @@ with st.sidebar:
         min_nights = (checkout - checkin).days
         weekends = False
         st.caption("Exact stay requires every night from check-in through the day before checkout.")
-    selected_names = st.multiselect("Cabins (blank = all)", sorted(id_by_name))
-    target_ids = {id_by_name[n] for n in selected_names} if selected_names else set(names)
-    selected_cabins = [c for c in cabins if str(c["id"]) in target_ids]
+    forest_choice = st.selectbox(
+        "National forest", ["All tracked forests"] + forests,
+        index=(forests.index("Custer Gallatin National Forest") + 1)
+              if "Custer Gallatin National Forest" in forests else 0,
+    )
+    eligible_forests = forests if forest_choice == "All tracked forests" else [forest_choice]
+    district_choices = sorted({
+        f"{forest} / {district}"
+        for forest in eligible_forests for district in districts_by_forest[forest]
+    })
+    chosen_districts = st.multiselect(
+        "Ranger districts (blank = all in selected forests)", district_choices
+    )
+    district_pairs = set(chosen_districts)
+    district_cabins = [
+        c for c in cabins
+        if c.get("forest", "Uncategorized") in eligible_forests
+        and (not chosen_districts or f"{c.get('forest', 'Uncategorized')} / {c.get('district', 'Unassigned')}" in district_pairs)
+    ]
+    district_names = {str(c["id"]): c.get("name", str(c["id"])) for c in district_cabins}
+    chosen_names = st.multiselect("Cabins (blank = all in selected districts)", sorted(district_names.values()))
+    target_ids = ({str(c["id"]) for c in district_cabins if c.get("name", str(c["id"])) in chosen_names}
+                  if chosen_names else {str(c["id"]) for c in district_cabins})
+    selected_cabins = [c for c in district_cabins if str(c["id"]) in target_ids]
+    st.caption("All means all cabins in this curated catalog, not every USFS rental in Montana.")
     valid_dates = checkout > checkin
     if not valid_dates:
         st.error("Checkout must be after check-in.")
+    if not selected_cabins:
+        st.warning("No cabins match these forests and districts.")
     nights_end = checkout - timedelta(days=1)
     request_count = len(selected_cabins) * len(months_between(checkin, nights_end)) if valid_dates else 0
-    st.caption(f"{len(selected_cabins)} cabins · {request_count} monthly API requests")
+    st.caption(f"{len(selected_cabins)} tracked cabins · {request_count} monthly API requests")
     scan_pressed = st.button("🔄 Check availability now", type="primary",
-                             use_container_width=True, disabled=not valid_dates)
+                             use_container_width=True, disabled=not valid_dates or not selected_cabins)
     st.caption("Changing filters updates the saved results immediately. Use Check availability now to retrieve new dates.")
 
 if scan_pressed:
