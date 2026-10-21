@@ -11,6 +11,10 @@ from pathlib import Path
 
 import streamlit as st
 import yaml
+import os
+
+from catalog_service import CatalogError, discover_montana, load_catalog, merge_catalog, save_catalog
+from report_email import build_report, send_report, validate_recipient
 
 from availability_service import (
     AccessBlocked, AvailabilityError, load_dashboard_snapshot,
@@ -20,6 +24,7 @@ from availability_service import (
 
 HERE = Path(__file__).resolve().parent
 CACHE_PATH = HERE / "dashboard_state.json"
+CATALOG_PATH = HERE / "ridb_catalog.json"
 TODAY = date.today()
 LAST_ALLOWED = TODAY + timedelta(days=365)
 
@@ -29,9 +34,10 @@ st.caption("Find an open Forest Service cabin · Check fresh dates directly agai
 
 try:
     config = yaml.safe_load((HERE / "config.yaml").read_text())
-    cabins = config["campgrounds"]
+    discovered = load_catalog(CATALOG_PATH)
+    cabins = merge_catalog(config["campgrounds"], discovered)
     snapshot = load_dashboard_snapshot(CACHE_PATH)
-except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError) as exc:
+except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError, CatalogError) as exc:
     st.error(f"Unable to load cabin configuration or saved results: {exc}")
     st.stop()
 
@@ -46,6 +52,9 @@ districts_by_forest = {
 
 with st.sidebar:
     st.header("Find a cabin")
+    st.caption(f"Catalog: {len(cabins)} tracked entries. RIDB last sync: {discovered.get('synced_at', 'never') if discovered else 'never'}")
+    sync_clicked = st.button("Sync Montana rental catalog (RIDB)", use_container_width=True)
+    st.caption("Requires RIDB_API_KEY. Catalog sync identifies *candidate* rentals; it cannot guarantee every Montana USFS cabin is represented.")
     mode = st.radio("Search for", ["Flexible dates", "Exact stay"], horizontal=True)
     checkin = st.date_input("Check-in / earliest arrival", TODAY,
                             min_value=TODAY, max_value=LAST_ALLOWED)
@@ -96,6 +105,16 @@ with st.sidebar:
                              use_container_width=True, disabled=not valid_dates or not selected_cabins)
     st.caption("Changing filters updates the saved results immediately. Use Check availability now to retrieve new dates.")
 
+if sync_clicked:
+    try:
+        with st.spinner("Reading Montana facility catalog from RIDB..."):
+            result = discover_montana(os.getenv("RIDB_API_KEY", ""))
+            save_catalog(CATALOG_PATH, result)
+        st.success(f"Catalog sync completed: {len(result['items'])} Montana cabin-like facility candidates found. Please verify forest/district assignments.")
+        st.rerun()
+    except (CatalogError, ValueError, OSError) as exc:
+        st.error(f"Catalog sync failed; existing catalog preserved: {exc}")
+
 if scan_pressed:
     progress_bar = st.progress(0, text="Starting availability check...")
     def on_progress(completed: int, total: int, name: str) -> None:
@@ -115,6 +134,31 @@ if not valid_dates:
     st.stop()
 
 st.subheader("Availability results")
+with st.expander("✉️ Email results to someone", expanded=False):
+    recipient = st.text_input("Recipient email address", placeholder="name@example.com", key="result_recipient")
+    email_clicked = st.button("Send results email", disabled=not recipient.strip())
+    if email_clicked:
+        try:
+            validate_recipient(recipient)
+            if snapshot is None:
+                raise ValueError("Run an availability scan first.")
+            saved_for_mail = set(snapshot.get("requested_ids", []))
+            if not target_ids.issubset(saved_for_mail):
+                raise ValueError("Scan your selected cabins first; some selected cabins are not in the snapshot.")
+            if (date.fromisoformat(snapshot["start_date"]) > checkin or
+                date.fromisoformat(snapshot["end_date"]) < nights_end):
+                raise ValueError("Scan your selected dates first; the saved data does not cover them.")
+            if snapshot.get("failures"):
+                raise ValueError("Some inventories failed. Please rerun a complete scan before emailing.")
+            relevant_cabins = [c for c in selected_cabins if str(c["id"]) in target_ids]
+            subject, text_body, html_body = build_report(
+                snapshot, relevant_cabins, checkin, checkout, min_nights, weekends,
+                mode == "Exact stay")
+            send_report(recipient, subject, text_body, html_body)
+            st.success(f"Report emailed to {recipient}.")
+        except (ValueError, RuntimeError, OSError, __import__('smtplib').SMTPException) as exc:
+            st.error(f"Email not sent: {exc}")
+
 if snapshot is None:
     st.info("No current scan saved yet. Choose your cabins and dates, then select **Check availability now**. The old alert history does not contain current availability.")
     st.stop()
