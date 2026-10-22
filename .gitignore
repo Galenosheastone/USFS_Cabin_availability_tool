@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+FS_Cabin_App/state.json
+FS_Cabin_App/config.local.yaml
+FS_Cabin_App/dashboard_state.json
+FS_Cabin_App/ridb_catalog.json

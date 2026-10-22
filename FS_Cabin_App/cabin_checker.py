@@ -62,8 +62,12 @@ def load_state(state_path: str) -> dict:
 
 def save_state(state_path: str, state: dict) -> None:
     state["last_checked"] = datetime.now().isoformat(timespec="seconds")
-    with open(state_path, "w") as f:
+    path = Path(state_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_suffix(path.suffix + '.tmp')
+    with open(temp_path, 'w') as f:
         json.dump(state, f, indent=2)
+    os.replace(temp_path, path)
     logger.debug("State saved to %s", state_path)
 
 
@@ -270,7 +274,7 @@ def compute_new_availability(
 
 def _build_month_calendar(year: int, month: int, available_dates: set) -> str:
     """Return an HTML mini-calendar table with available dates highlighted green."""
-    cal_weeks = cal_module.monthcalendar(year, month)
+    cal_weeks = cal_module.Calendar(firstweekday=6).monthdayscalendar(year, month)
     month_name = date(year, month, 1).strftime("%B %Y")
 
     html = (
@@ -411,6 +415,10 @@ def compose_email(
 def send_email(config: dict, subject: str, html_body: str, text_body: str) -> bool:
     """Send notification email. Returns True on success."""
     ec = config["email"]
+    password = os.environ.get('CABIN_GMAIL_APP_PASSWORD') or ec.get('sender_password')
+    if not password:
+        logger.error('Set CABIN_GMAIL_APP_PASSWORD to enable email notifications.')
+        return False
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = ec["sender_email"]
@@ -423,7 +431,7 @@ def send_email(config: dict, subject: str, html_body: str, text_body: str) -> bo
         with smtplib.SMTP(ec["smtp_server"], ec["smtp_port"]) as smtp:
             smtp.ehlo()
             smtp.starttls()
-            smtp.login(ec["sender_email"], ec["sender_password"])
+            smtp.login(ec["sender_email"], password)
             smtp.sendmail(ec["sender_email"], ec["recipients"], msg.as_string())
         logger.info("Email sent to: %s", ", ".join(ec["recipients"]))
         return True
@@ -476,8 +484,11 @@ def main() -> None:
         logger.info("State reset. Next run will alert on all found availability.")
         return
 
-    start = date.fromisoformat(config["search"]["start_date"])
-    end = date.fromisoformat(config["search"]["end_date"])
+    search = config['search']
+    start = date.fromisoformat(search['start_date']) if search.get('start_date') else date.today()
+    end = date.fromisoformat(search['end_date']) if search.get('end_date') else start + timedelta(days=int(search.get('lookahead_days', 180)))
+    if end < start:
+        raise ValueError('Search end_date must be on or after start_date')
     min_nights = config["search"].get("min_nights", 1)
     mode = config["notifications"]["mode"]
 
@@ -528,6 +539,7 @@ def main() -> None:
     # Strip campgrounds with no new dates
     new_avail = {cg_id: sites for cg_id, sites in new_avail.items() if sites}
 
+    email_sent = False
     if not new_avail:
         logger.info("No new availability to report.")
     else:
@@ -542,17 +554,20 @@ def main() -> None:
             print(text_body)
             print("------------------------------------\n")
         elif config["email"].get("enabled", True):
-            ok = send_email(config, subject, html_body, text_body)
-            if not ok:
+            email_sent = send_email(config, subject, html_body, text_body)
+            if not email_sent:
                 logger.error("Email failed — printing results to stdout instead:")
                 print(text_body)
         else:
             logger.info("Email disabled in config. Results:")
             print(text_body)
 
-    # Save updated state (even on dry-run, so we track what we've seen)
-    state["availability"] = current_avail
-    save_state(state_path, state)
+    # Dry runs must not consume notifications; failed email must not acknowledge openings.
+    if not args.dry_run and (not new_avail or (config['email'].get('enabled', True) and email_sent)):
+        state['availability'] = current_avail
+        save_state(state_path, state)
+    elif not args.dry_run:
+        logger.warning('State not advanced: notifications were not delivered.')
     logger.info("Done.")
 
 
